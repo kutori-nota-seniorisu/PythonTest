@@ -42,8 +42,35 @@ N, Wn = signal.cheb1ord(Wp, Ws, Rp, Rs)
 bp_R = 0.5
 B, A = signal.cheby1(N, bp_R, Wn, "bandpass")
 
+# 生成参考信号
+num_harms = 4
+w_sincos = 0
+num_freqs = len(freqList)
+y_ref = np.zeros((num_freqs, 2 * num_harms, downBuffSize))
+t = np.array([i / downSampleRate for i in range(1, downBuffSize + 1)])
+# 对每个参考频率都生成参考波形
+for freq_i in range(0, num_freqs):
+	tmp = np.zeros((2 * num_harms, downBuffSize))
+	# harm:harmonic wave 谐波
+	for harm_i in range(0, num_harms):
+		stim_freq = freqList[freq_i]
+		# Frequencies other than the reference frequency
+		d_sin = np.zeros((num_freqs, downBuffSize))
+		d_cos = np.zeros((num_freqs, downBuffSize))
+		for freq_j in range(0, num_freqs):
+			if freq_j != freq_i:
+				d_freq = freqList[freq_j]
+				d_sin[freq_j, :] = np.sin(2 * np.pi * (harm_i + 1) * d_freq * t)
+				d_cos[freq_j, :] = np.cos(2 * np.pi * (harm_i + 1) * d_freq * t)
+		temp_d_sin = np.sum(d_sin, 0)
+		temp_d_cos = np.sum(d_cos, 0)
+		# superposition of the reference frequency with other frequencies
+		tmp[2 * harm_i] = (np.sin(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_sin)
+		tmp[2 * harm_i + 1] = (np.cos(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_cos)
+	y_ref[freq_i] = tmp
+
 # 从 mat 文件中读取数据
-rawdata = scio.loadmat('./eegdata.mat')
+rawdata = scio.loadmat('E:/VSCode/eegdata.mat')
 data = np.array(rawdata['eegdata'])
 print("数组形状：", data.shape)
 print("数组第一维：", data.shape[1])
@@ -91,33 +118,6 @@ for exper_i in range(0, data.shape[3]):
 				data_bandpass[chan_th, :] = signal.filtfilt(B, A, data_removeBaseline[chan_th, :])
 
 			# print("降采样后的数组形状：", data_downSample.shape)
-
-			# SinCos_Ref --- used to generate the superimposed reference signal
-			num_harms = 4
-			w_sincos = 0
-			num_freqs = len(freqList)
-			y_ref = np.zeros((num_freqs, 2 * num_harms, downBuffSize))
-			t = np.array([i / downSampleRate for i in range(1, downBuffSize + 1)])
-			# 对每个参考频率都生成参考波形
-			for freq_i in range(0, num_freqs):
-				tmp = np.zeros((2 * num_harms, downBuffSize))
-				# harm:harmonic wave 谐波
-				for harm_i in range(0, num_harms):
-					stim_freq = freqList[freq_i]
-					# Frequencies other than the reference frequency
-					d_sin = np.zeros((num_freqs, downBuffSize))
-					d_cos = np.zeros((num_freqs, downBuffSize))
-					for freq_j in range(0, num_freqs):
-						if freq_j != freq_i:
-							d_freq = freqList[freq_j]
-							d_sin[freq_j, :] = np.sin(2 * np.pi * (harm_i + 1) * d_freq * t)
-							d_cos[freq_j, :] = np.cos(2 * np.pi * (harm_i + 1) * d_freq * t)
-					temp_d_sin = np.sum(d_sin, 0)
-					temp_d_cos = np.sum(d_cos, 0)
-					# superposition of the reference frequency with other frequencies
-					tmp[2 * harm_i] = (np.sin(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_sin)
-					tmp[2 * harm_i + 1] = (np.cos(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_cos)
-				y_ref[freq_i] = tmp
 
 			# Intercept a data segment
 			num_smpls = 4 * downSampleRate
