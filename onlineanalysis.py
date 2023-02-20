@@ -5,13 +5,42 @@ from sklearn.cross_decomposition import CCA
 from scipy import signal
 from statistics import median
 
+# 相关变量及参数设置
+# 数组缓存区大小
 BUFFSIZE = 18432
+# 采样频率
 sampleRate = 2048
+# 频率序列
 freqList = [9, 10, 11, 12, 13, 14, 15, 16, 17]
 
-# 创建二维数组
-# rawdata = np.zeros((35, 12800))
-# data_used = rawdata
+# downsampling, 50Hz notch filter, remove baseline, band-pass filter
+# 参数：降采样
+downSamplingNum = 8
+downSampleRate = sampleRate / downSamplingNum
+downBuffSize = int(BUFFSIZE / downSamplingNum)
+
+# 参数：50Hz陷波滤波器
+# 将要被移除的频率 (Hz)
+f_notch = 50
+Ts = 1 / downSampleRate
+alpha = -2 * np.cos(2 * np.pi * f_notch * Ts)
+beta = 0.95
+# 构造滤波器
+notch_b = [1, alpha, 1]
+notch_a = [1, alpha * beta, beta**2]
+
+# 参数：带通滤波器
+# 通带阻带截止频率
+Wp = [7 / (downSampleRate / 2), 70 / (downSampleRate / 2)]
+Ws = [5 / (downSampleRate / 2), 80 / (downSampleRate / 2)]
+# 通带最大衰减 [dB]
+Rp = 3
+# 阻带最小衰减 [dB]
+Rs = 60
+N, Wn = signal.cheb1ord(Wp, Ws, Rp, Rs)
+# peak-to-peak ripple with R dB in the passband
+bp_R = 0.5
+B, A = signal.cheby1(N, bp_R, Wn, "bandpass")
 
 # 从 mat 文件中读取数据
 rawdata = scio.loadmat('./eegdata.mat')
@@ -44,39 +73,10 @@ for exper_i in range(0, data.shape[3]):
 			# the number of channels usd
 			channel_usedNum = len(ch_used)
 
-			# downsampling, 50Hz notch filter, remove baseline, band-pass filter
-			# Parameter: downsampling
-			downSamplingNum = 8
-			downSampleRate = sampleRate / downSamplingNum
-			downBuffSize = int(BUFFSIZE / downSamplingNum)
+			# 构造数组，存储处理的数据
 			data_downSample = np.zeros((channel_usedNum, downBuffSize))
-
-			# Parameter: 50Hz notch filter
-			# Frequency to be removed from signal (Hz)
-			f_notch = 50
-			Ts = 1 / downSampleRate
-			alpha = -2 * np.cos(2 * np.pi * f_notch * Ts)
-			beta = 0.95
-			# Design notch filter
-			notch_b = [1, alpha, 1]
-			notch_a = [1, alpha * beta, beta**2]
 			data_50hz = np.zeros((channel_usedNum, downBuffSize))
-
-			# Parameter: remove baseline
 			data_removeBaseline = np.zeros((channel_usedNum, downBuffSize))
-
-			# Parameter: band-pass filter
-			# the pass bandof a bandpass filter
-			Wp = [7 / (downSampleRate / 2), 70 / (downSampleRate / 2)]
-			Ws = [5 / (downSampleRate / 2), 80 / (downSampleRate / 2)]
-			# the maximun allowable passband attenuation [dB]
-			Rp = 3
-			# the stopband allows a minimum attenuation [dB]
-			Rs = 60
-			N, Wn = signal.cheb1ord(Wp, Ws, Rp, Rs)
-			# peak-to-peak ripple with R dB in the passband
-			bp_R = 0.5
-			B, A = signal.cheby1(N, bp_R, Wn, "bandpass")
 			data_bandpass = np.zeros((channel_usedNum, downBuffSize))
 
 			# data pre-processing
