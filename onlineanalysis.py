@@ -69,6 +69,9 @@ for freq_i in range(0, num_freqs):
 		tmp[2 * harm_i + 1] = (np.cos(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_cos)
 	y_ref[freq_i] = tmp
 
+# 标志相机启动与否的变量，为 false 时未启动，为 true 时启动
+camera_on = False
+
 # 从 mat 文件中读取数据
 rawdata = scio.loadmat('E:/VSCode/eegdata.mat')
 data = np.array(rawdata['eegdata'])
@@ -136,5 +139,35 @@ for exper_i in range(0, data.shape[3]):
 			index_class_cca = np.argmax(r_cca)
 			result = freqList[index_class_cca]
 			res[exper_i, target_i] = result
+
+			# 根据分析结果发布指令
+			if result == 20:
+				# do something
+				print("the frequency to start camera is", result)
+				camera_on = True
+			if camera_on == True:
+				match result:
+					case 9:
+						print(9)
+					case 10:
+						print(10)
+					case 11:
+						print(11)
+					case 12:
+						print(12)
+					case 13:
+						print(13)
+					case 14:
+						print(14)
+					case 15:
+						print(15)
+					case 16:
+						print(16)
+					case 17:
+						print(17)
+					case _:
+						print("I am everything~")
+
+
 
 print(res)
