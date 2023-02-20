@@ -1,8 +1,9 @@
 # -*- coding: UTF-8 -*-
+# mat 数组读取
 import scipy.io as scio
 import numpy as np
 
-data = scio.loadmat('./eegdata.mat')
+data = scio.loadmat('E:/VSCode/eegdata.mat')
 print(type(data))
 
 # 这个方法是读不出来数组内容的

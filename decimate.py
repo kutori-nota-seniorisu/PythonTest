@@ -1,7 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""
-降采样的实现，调用 scipy 库中 signal 的函数 decimate 进行降采样，使用方法类似于 MATLAB 中的操作
-"""
+# 降采样的实现，调用 scipy 库中 signal 的函数 decimate 进行降采样，使用方法类似于 MATLAB 中的操作
 import numpy as np
 from scipy import signal
 import matplotlib.pyplot as plt

@@ -1,7 +1,5 @@
 # -*- coding: UTF-8 -*-
-"""
-陷波滤波的实现，使用了两种方法
-"""
+# 陷波滤波的实现，使用了两种方法
 import numpy as np
 from scipy import signal
 import numpy.fft as fft

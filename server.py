@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# tcp/ip 的 python 实现，服务端
 # 引入socket库
 import socket
 # 定义一个ip协议版本AF_INET(IPv4)，定义一个传输TCP协议(SOCK_STREAM)
