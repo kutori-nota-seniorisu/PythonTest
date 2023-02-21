@@ -83,7 +83,8 @@ print("数组形状：", eegdata.shape)
 print("数组第一维：", eegdata.shape[1])
 
 # 存储结果
-res = np.zeros((eegdata.shape[3], eegdata.shape[2]))
+ana_count = int((eegdata.shape[1] - BUFFSIZE) / (2 * packetSize) + 1)
+res = np.zeros((eegdata.shape[3], eegdata.shape[2], ana_count))
 
 for exper_i in range(0, eegdata.shape[3]):
 	for target_i in range(0, eegdata.shape[2]):
@@ -108,8 +109,8 @@ for exper_i in range(0, eegdata.shape[3]):
 						continue
 				else:
 					continue
-			# 当数组长度超过缓存长度，则进行处理
 
+			# 当数组长度超过缓存长度，则进行处理
 			# 选择导联
 			# ch_used = [21, 25, 26, 27, 28, 29, 30, 31, 32]
 			ch_used = [20, 24, 25, 26, 27, 28, 29, 30, 31]
@@ -142,8 +143,8 @@ for exper_i in range(0, eegdata.shape[3]):
 
 			# Intercept a data segment
 			num_smpls = 4 * downSampleRate
-			ref_data = y_ref[:, :, int(0.5 * downSampleRate): int(0.5 * downSampleRate + num_smpls)]
-			test_data = data_bandpass[:, int(0.5 * downSampleRate): int(0.5 * downSampleRate + num_smpls)].T
+			ref_data = y_ref
+			test_data = data_bandpass.T
 			# CCA
 			num_class_cca = len(freqList)
 			r_cca = np.zeros((num_class_cca))
@@ -156,7 +157,8 @@ for exper_i in range(0, eegdata.shape[3]):
 				r_cca[class_i] = r_tmp_cca
 			index_class_cca = np.argmax(r_cca)
 			result = freqList[index_class_cca]
-			res[exper_i, target_i] = result
+			ana_i = int((packet_i - 15) / 2)
+			res[exper_i, target_i, ana_i] = result
 
 			# 根据分析结果发布指令
 			if result == 20:
@@ -186,4 +188,5 @@ for exper_i in range(0, eegdata.shape[3]):
 					case _:
 						print("I am everything~")
 
+	print(res[exper_i])
 print(res)
