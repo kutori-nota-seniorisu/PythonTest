@@ -80,7 +80,7 @@ data_used = np.array([])
 # 从 mat 文件中读取数据
 eegdata = np.array(scio.loadmat('E:/VSCode/eegdata.mat')['eegdata'])
 print("数组形状：", eegdata.shape)
-print("数组第一维：", eegdata.shape[1])
+print("数组第二维：", eegdata.shape[1])
 
 # 存储结果
 ana_count = int((eegdata.shape[1] - BUFFSIZE) / (2 * packetSize) + 1)
@@ -90,7 +90,6 @@ for exper_i in range(0, eegdata.shape[3]):
 	for target_i in range(0, eegdata.shape[2]):
 		# 把原数组降至二维
 		data = eegdata[:, :, target_i, exper_i]
-		# data_used = data[:, :, 0, 0]
 		# print("data_used形状：", data_used.shape)
 
 		# 每次读取一个 packet 的数据并拼接
@@ -141,26 +140,26 @@ for exper_i in range(0, eegdata.shape[3]):
 
 			# print("降采样后的数组形状：", data_downSample.shape)
 
-			# Intercept a data segment
-			num_smpls = 4 * downSampleRate
 			ref_data = y_ref
 			test_data = data_bandpass.T
 			# CCA
 			num_class_cca = len(freqList)
+			# 用于存储数据与参考信号的相关系数
 			r_cca = np.zeros((num_class_cca))
 			for class_i in range(0, num_class_cca):
 				refdata_cca = ref_data[class_i].T
 				cca = CCA(n_components=1)
 				cca.fit(test_data, refdata_cca)
 				U, V = cca.transform(test_data, refdata_cca)
-				r_tmp_cca = np.corrcoef(U[:, 0], V[:, 0])[0, 1]
-				r_cca[class_i] = r_tmp_cca
+				r_cca[class_i] = np.corrcoef(U[:, 0], V[:, 0])[0, 1]
+			# 获取相关系数值最大的序号
 			index_class_cca = np.argmax(r_cca)
 			result = freqList[index_class_cca]
+
 			ana_i = int((packet_i - 15) / 2)
 			res[exper_i, target_i, ana_i] = result
 
-			# 根据分析结果发布指令
+			# 根据分析结果发布指令，每次分析结束后都执行一次
 			if result == 20:
 				# do something
 				print("the frequency to start camera is", result)
@@ -188,5 +187,5 @@ for exper_i in range(0, eegdata.shape[3]):
 					case _:
 						print("I am everything~")
 
-	print(res[exper_i])
+	print("target x analysis:", res[exper_i])
 print(res)
