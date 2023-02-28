@@ -77,8 +77,8 @@ camera_on = False
 # 用于分析的数据数组
 data_used = np.array([])
 
-# 从 mat 文件中读取数据
-eegdata = np.array(scio.loadmat('E:/VSCode/eegdata.mat')['eegdata'])
+# 从 mat 文件中读取数据，v7版本前的用scio读取，v7版本后的用h5py读取
+eegdata = np.array(scio.loadmat('E:/VSCode/eegdata_v7.mat')['eegdata'])
 print("数组形状：", eegdata.shape)
 print("数组第二维：", eegdata.shape[1])
 
@@ -97,95 +97,91 @@ for exper_i in range(0, eegdata.shape[3]):
 			packet = data[:, packet_i * packetSize : (packet_i + 1) * packetSize]
 			if data_used.size == 0:
 				data_used = packet
-				continue
 			else:
 				data_used = np.hstack((data_used, packet))
 				delta = data_used.shape[1] - BUFFSIZE
 				if delta >= 0:
 					if (delta / packetSize) % 2 == 0:
 						data_used = data_used[:, -BUFFSIZE : ]
-					else:
-						continue
-				else:
-					continue
 
-			# 当数组长度超过缓存长度，则进行处理
-			# 选择导联
-			# ch_used = [21, 25, 26, 27, 28, 29, 30, 31, 32]
-			ch_used = [20, 24, 25, 26, 27, 28, 29, 30, 31]
+			if data_used.shape[1] == BUFFSIZE:
+				# 当数组长度超过缓存长度，则进行处理
+				# 选择导联
+				# ch_used = [21, 25, 26, 27, 28, 29, 30, 31, 32]
+				ch_used = [20, 24, 25, 26, 27, 28, 29, 30, 31]
 
-			# data used
-			data_chused = data_used[ch_used, :]
-			# print("data_chused形状", data_chused.shape)
+				# data used
+				data_chused = data_used[ch_used, :]
+				# print("data_chused形状", data_chused.shape)
 
-			# the number of channels usd
-			channel_usedNum = len(ch_used)
+				# the number of channels usd
+				channel_usedNum = len(ch_used)
 
-			# 构造数组，存储处理的数据
-			data_downSample = np.zeros((channel_usedNum, downBuffSize))
-			data_50hz = np.zeros((channel_usedNum, downBuffSize))
-			data_removeBaseline = np.zeros((channel_usedNum, downBuffSize))
-			data_bandpass = np.zeros((channel_usedNum, downBuffSize))
+				# 构造数组，存储处理的数据
+				data_downSample = np.zeros((channel_usedNum, downBuffSize))
+				data_50hz = np.zeros((channel_usedNum, downBuffSize))
+				data_removeBaseline = np.zeros((channel_usedNum, downBuffSize))
+				data_bandpass = np.zeros((channel_usedNum, downBuffSize))
 
-			# data pre-processing
-			for chan_th in range(0, channel_usedNum):
-				# downsampling
-				data_downSample[chan_th, :] = signal.decimate(data_chused[chan_th, :], downSamplingNum, ftype='fir')
-				# 50Hz notch filter
-				data_50hz[chan_th, :] = signal.filtfilt(notch_b, notch_a, data_downSample[chan_th, :])
-				# remove baseline
-				data_removeBaseline[chan_th, :] = data_50hz[chan_th,:] - median(data_50hz[chan_th, :])
-				# bandpass filter
-				data_bandpass[chan_th, :] = signal.filtfilt(B, A, data_removeBaseline[chan_th, :])
+				# data pre-processing
+				for chan_th in range(0, channel_usedNum):
+					# downsampling
+					data_downSample[chan_th, :] = signal.decimate(data_chused[chan_th, :], downSamplingNum, ftype='fir')
+					# 50Hz notch filter
+					data_50hz[chan_th, :] = signal.filtfilt(notch_b, notch_a, data_downSample[chan_th, :])
+					# remove baseline
+					data_removeBaseline[chan_th, :] = data_50hz[chan_th,:] - median(data_50hz[chan_th, :])
+					# bandpass filter
+					data_bandpass[chan_th, :] = signal.filtfilt(B, A, data_removeBaseline[chan_th, :])
 
-			# print("降采样后的数组形状：", data_downSample.shape)
+				# print("降采样后的数组形状：", data_downSample.shape)
 
-			ref_data = y_ref
-			test_data = data_bandpass.T
-			# CCA
-			num_class_cca = len(freqList)
-			# 用于存储数据与参考信号的相关系数
-			r_cca = np.zeros((num_class_cca))
-			for class_i in range(0, num_class_cca):
-				refdata_cca = ref_data[class_i].T
-				cca = CCA(n_components=1)
-				cca.fit(test_data, refdata_cca)
-				U, V = cca.transform(test_data, refdata_cca)
-				r_cca[class_i] = np.corrcoef(U[:, 0], V[:, 0])[0, 1]
-			# 获取相关系数值最大的序号
-			index_class_cca = np.argmax(r_cca)
-			result = freqList[index_class_cca]
+				ref_data = y_ref
+				test_data = data_bandpass.T
+				# CCA
+				num_class_cca = len(freqList)
+				# 用于存储数据与参考信号的相关系数
+				r_cca = np.zeros((num_class_cca))
+				for class_i in range(0, num_class_cca):
+					refdata_cca = ref_data[class_i].T
+					cca = CCA(n_components=1)
+					cca.fit(test_data, refdata_cca)
+					U, V = cca.transform(test_data, refdata_cca)
+					r_cca[class_i] = np.corrcoef(U[:, 0], V[:, 0])[0, 1]
+				# 获取相关系数值最大的序号
+				index_class_cca = np.argmax(r_cca)
+				result = freqList[index_class_cca]
 
-			ana_i = int((packet_i - 15) / 2)
-			res[exper_i, target_i, ana_i] = result
+				ana_i = int((packet_i - 15) / 2)
+				res[exper_i, target_i, ana_i] = result
 
-			# 根据分析结果发布指令，每次分析结束后都执行一次
-			if result == 20:
-				# do something
-				print("the frequency to start camera is", result)
-				camera_on = True
-			if camera_on == True:
-				match result:
-					case 9:
-						print(9)
-					case 10:
-						print(10)
-					case 11:
-						print(11)
-					case 12:
-						print(12)
-					case 13:
-						print(13)
-					case 14:
-						print(14)
-					case 15:
-						print(15)
-					case 16:
-						print(16)
-					case 17:
-						print(17)
-					case _:
-						print("I am everything~")
+				# 根据分析结果发布指令，每次分析结束后都执行一次
+				if result == 20:
+					# do something
+					print("the frequency to start camera is", result)
+					camera_on = True
+				if camera_on == True:
+					match result:
+						case 9:
+							print(9)
+						case 10:
+							print(10)
+						case 11:
+							print(11)
+						case 12:
+							print(12)
+						case 13:
+							print(13)
+						case 14:
+							print(14)
+						case 15:
+							print(15)
+						case 16:
+							print(16)
+						case 17:
+							print(17)
+						case _:
+							print("I am everything~")
 
 	print("target x analysis:", res[exper_i])
 print(res)
