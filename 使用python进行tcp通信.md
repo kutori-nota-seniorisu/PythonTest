@@ -1,8 +1,11 @@
+# 在python中实现tcp通信
+
 在python中实现tcp通信比较简单，只需要导入socket库即可。
 
 首先是代码
 
 服务端
+
 ```python
 # -*- coding: utf-8 -*-
 # 引入socket库
@@ -30,7 +33,9 @@ while True:
     if message == ('bye'):
         break
 ```
+
 客户端
+
 ```py
 # -*- coding: utf-8 -*-
 # 导入socket库
