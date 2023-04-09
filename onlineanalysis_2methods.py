@@ -4,9 +4,6 @@ import scipy.io as scio
 from sklearn.cross_decomposition import CCA
 from scipy import signal
 import time
-import sys
-
-sys.path.append(r'E:\\VSCode\\PythonTest')
 import basic_filterbank
 
 # 相关变量及参数设置
