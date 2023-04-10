@@ -1,5 +1,4 @@
 import numpy as np
-from statistics import median
 
 a = np.array([[1, 2, 3, 4], [5, 5, 7, 7]])
 print(a)

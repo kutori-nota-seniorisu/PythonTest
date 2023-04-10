@@ -8,16 +8,6 @@ import numpy as np
 test = np.zeros((2, 3))
 ```
 
-## 使用 math 调用相关函数与常量
-
-```py
-import math
-# 输出π，输出结果为3.141592653589793
-print(math.pi)
-# 使用余弦函数，输出结果为-1.0
-print(math.cos(math.pi))
-```
-
 ## python 中的运算符
 
 ```py
@@ -219,3 +209,25 @@ for number in range(1, 6):
 ## 寻找最大最小值及其索引
 
 [python寻找最大最小值并返回位置](https://blog.csdn.net/yitanjiong4414/article/details/88965668)
+
+## python 读取 .mat 文件数据
+
+```py
+# readMat.py
+# -*- coding: UTF-8 -*-
+# mat 数组读取
+import scipy.io as scio
+import numpy as np
+
+data = scio.loadmat('E:/VSCode/eegdata.mat')
+print(type(data))
+
+# 这个方法是读不出来数组内容的
+pydata1 = np.array(data)
+
+# 读取的时候一定要带上需要读取变量的名称
+pydata2 = np.array(data['eegdata'])
+
+print(pydata2)
+print(pydata2[:, :, :, 0].shape)
+```
