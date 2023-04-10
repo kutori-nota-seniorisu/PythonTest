@@ -126,12 +126,6 @@ conda config --set show_channel_urls yes
 
 解决方法：搜索 Windows powershell 并以管理员身份打开，在命令行中输入`set-executionpolicy remotesigned`，然后输入y并回车，最后重启 vscode 即可。
 
-## python 信号处理
-
-在 python 中进行信号处理时，我们使用 scipy 这个包，在使用时，我们导入 scipy 包中的 signal 模块。
-
-该模块中内置了许多信号处理的函数，且与 matlab 十分相似，具体函数及其使用方法可以查看 signal 模块的对应源文件。通过查看函数定义，可以了解函数输入输出参数的含义，以及官方给出的例程。
-
 ## python for 循环
 
 python for 循环可以遍历任何可以迭代的对象，如一个列表或者一个字符串。
