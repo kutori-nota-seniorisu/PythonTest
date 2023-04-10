@@ -225,3 +225,27 @@ pydata2 = np.array(data['eegdata'])
 print(pydata2)
 print(pydata2[:, :, :, 0].shape)
 ```
+
+## 中位数的使用
+
+```py
+import numpy as np
+
+a = np.array([[1, 2, 3, 4], [5, 5, 7, 7]])
+print(a)
+print(np.median(a, -1))
+b = a - np.median(a, -1).reshape(2, 1)
+print(b)
+```
+
+输出结果
+
+```text
+[[1 2 3 4]
+ [5 5 7 7]]
+
+[2.5 6. ]
+
+[[-1.5 -0.5  0.5  1.5]
+ [-1.  -1.   1.   1. ]]
+```
