@@ -87,18 +87,15 @@ for freq_i in range(0, num_freqs):
 # 标志相机启动与否的变量，为 false 时未启动，为 true 时启动
 camera_on = False
 
-# 用于分析的数据数组
-data_used = np.array([])
-
 # 从 mat 文件中读取数据，v7版本前的用scio读取，v7版本后的用h5py读取
 eegdata = np.array(scio.loadmat('E:/VSCode/eegdata_del3s_v7.mat')['eegdata'])
 print("数组形状：", eegdata.shape)
 print("数组第二维：", eegdata.shape[1])
 packetNum = int(eegdata.shape[1] / packetSize)
-print(packetNum)
 
 # 存储结果
 ana_count = int((eegdata.shape[1] - BUFFSIZE) / (2 * packetSize) + 1)
+print('ana_count:', ana_count)
 res = np.zeros((eegdata.shape[3], eegdata.shape[2], ana_count))
 result = 0
 
@@ -107,6 +104,8 @@ for exper_i in range(0, eegdata.shape[3]):
 		# 把原数组降至二维
 		data = eegdata[:, :, target_i, exper_i]
 		# print("data_used形状：", data_used.shape)
+		# 用于分析的数据数组
+		data_used = np.array([])
 
 		# 每次读取一个 packet 的数据并拼接
 		for packet_i in range(0, packetNum):
@@ -131,7 +130,6 @@ for exper_i in range(0, eegdata.shape[3]):
 
 				# data used
 				data_chused = data_used[ch_used, :]
-				# print("data_chused形状", data_chused.shape)
 
 				# the number of channels usd
 				channel_usedNum = len(ch_used)
@@ -214,7 +212,8 @@ for exper_i in range(0, eegdata.shape[3]):
 					# end = time.perf_counter()
 					# print("执行一次方法二需用时", end - start)
 
-				ana_i = int((packet_i - 15) / 2)
+				buffNum = BUFFSIZE / packetSize - 1
+				ana_i = int((packet_i - buffNum) / 2)
 				res[exper_i, target_i, ana_i] = result
 
 				# 根据分析结果发布指令，每次分析结束后都执行一次
@@ -248,6 +247,5 @@ for exper_i in range(0, eegdata.shape[3]):
 				# print("退出分析")
 				# end = time.perf_counter()
 				# print("执行一次分析需用时", end - start)
-
 	print("target x analysis:", res[exper_i])
-print(res)
+print("final result:", res)
