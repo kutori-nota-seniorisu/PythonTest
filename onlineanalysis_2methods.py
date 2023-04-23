@@ -7,10 +7,10 @@ import time
 import basic_filterbank
 
 # 相关变量及参数设置
-# 数组缓存区大小
-BUFFSIZE = 8192
 # 采样频率
 sampleRate = 2048
+# 数组缓存区大小
+BUFFSIZE = sampleRate * 2
 # 频率序列
 freqList = [9, 10, 11, 12, 13, 14, 15, 16, 17]
 # 每个数据包大小
@@ -91,9 +91,11 @@ camera_on = False
 data_used = np.array([])
 
 # 从 mat 文件中读取数据，v7版本前的用scio读取，v7版本后的用h5py读取
-eegdata = np.array(scio.loadmat('E:/VSCode/eegdata_v7.mat')['eegdata'])
+eegdata = np.array(scio.loadmat('E:/VSCode/eegdata_del3s_v7.mat')['eegdata'])
 print("数组形状：", eegdata.shape)
 print("数组第二维：", eegdata.shape[1])
+packetNum = int(eegdata.shape[1] / packetSize)
+print(packetNum)
 
 # 存储结果
 ana_count = int((eegdata.shape[1] - BUFFSIZE) / (2 * packetSize) + 1)
@@ -107,7 +109,7 @@ for exper_i in range(0, eegdata.shape[3]):
 		# print("data_used形状：", data_used.shape)
 
 		# 每次读取一个 packet 的数据并拼接
-		for packet_i in range(0, 36):
+		for packet_i in range(0, packetNum):
 			packet = data[:, packet_i * packetSize : (packet_i + 1) * packetSize]
 			if data_used.size == 0:
 				data_used = packet
