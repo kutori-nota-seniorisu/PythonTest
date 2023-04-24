@@ -5,6 +5,7 @@ from sklearn.cross_decomposition import CCA
 from scipy import signal
 import time
 import basic_filterbank
+import sincos_ref
 
 # 相关变量及参数设置
 # 采样频率
@@ -60,29 +61,7 @@ fb_coefs = np.array([(n + 1)**(-a_fbcca) + b_fbcca for n in range(0, num_fbs)])
 # 生成参考信号
 num_harms = 4
 w_sincos = 0
-num_freqs = len(freqList)
-y_ref = np.zeros((num_freqs, 2 * num_harms, downBuffSize))
-t = np.array([(i + 1) / downSampleRate for i in range(0, downBuffSize)])
-# 对每个参考频率都生成参考波形
-for freq_i in range(0, num_freqs):
-	tmp = np.zeros((2 * num_harms, downBuffSize))
-	# harm:harmonic wave 谐波
-	for harm_i in range(0, num_harms):
-		stim_freq = freqList[freq_i]
-		# Frequencies other than the reference frequency
-		d_sin = np.zeros((num_freqs, downBuffSize))
-		d_cos = np.zeros((num_freqs, downBuffSize))
-		for freq_j in range(0, num_freqs):
-			if freq_j != freq_i:
-				d_freq = freqList[freq_j]
-				d_sin[freq_j, :] = np.sin(2 * np.pi * (harm_i + 1) * d_freq * t)
-				d_cos[freq_j, :] = np.cos(2 * np.pi * (harm_i + 1) * d_freq * t)
-		temp_d_sin = np.sum(d_sin, 0)
-		temp_d_cos = np.sum(d_cos, 0)
-		# superposition of the reference frequency with other frequencies
-		tmp[2 * harm_i] = (np.sin(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_sin)
-		tmp[2 * harm_i + 1] = (np.cos(2 * np.pi * (harm_i + 1) *stim_freq * t) + w_sincos * temp_d_cos)
-	y_ref[freq_i] = tmp
+y_ref = sincos_ref.sincosref(freqList, downSampleRate, downBuffSize, num_harms, w_sincos)
 
 # 标志相机启动与否的变量，为 false 时未启动，为 true 时启动
 camera_on = False
