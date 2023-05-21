@@ -3,23 +3,30 @@ import numpy as np
 import scipy.io as scio
 from sklearn.cross_decomposition import CCA
 from scipy import signal
-import time
+import find
 import basic_filterbank
 import sincos_ref
 
 # 相关变量及参数设置
 # 采样频率
 sampleRate = 2048
+# 使用的数据长度，单位：s
+t_used = 2
 # 数组缓存区大小
-BUFFSIZE = sampleRate * 2
+BUFFSIZE = int(sampleRate * t_used)
 # 频率序列
 freqList = [9, 10, 11, 12, 13, 14, 15, 16, 17]
 # 每个数据包大小
 packetSize = 512
+# 分析间隔：0.5s
+anaInter = 0.5
+# 分类结果阈值
+r_threshold = 0
 # 选用分析方法，method = 1:CCA，method = 2:FBCCA
-method = 1
+method = 2
+# 选择结果判断方法，isfind = 1:至少三次相同才输出结果，isfind = 0:直接输出结果
+isfind = 0
 
-# 数据预处理：downsampling, 50Hz notch filter, remove baseline, band-pass filter
 # 参数：降采样
 downSamplingNum = 8
 downSampleRate = sampleRate / downSamplingNum
@@ -48,11 +55,8 @@ N, Wn = signal.cheb1ord(Wp, Ws, Rp, Rs)
 bp_R = 0.5
 B, A = signal.cheby1(N, bp_R, Wn, "bandpass")
 
-# FBCCA：滤波器组设计
-passband = [6, 14, 22, 30, 38, 46, 54, 62, 70, 78]
-stopband = [4, 10, 16, 24, 32, 40, 48, 56, 64, 72]
 # 五个子带
-num_fbs = 5
+num_fbs = 2
 # 权重系数
 a_fbcca = 1.25
 b_fbcca = 0.25
@@ -60,7 +64,8 @@ fb_coefs = np.array([(n + 1)**(-a_fbcca) + b_fbcca for n in range(0, num_fbs)])
 
 # 生成参考信号
 num_harms = 4
-w_sincos = 0
+# 权重给-0.02
+w_sincos = -0.02
 y_ref = sincos_ref.sincosref(freqList, downSampleRate, downBuffSize, num_harms, w_sincos)
 
 # 标志相机启动与否的变量，为 false 时未启动，为 true 时启动
@@ -75,14 +80,21 @@ packetNum = int(eegdata.shape[1] / packetSize)
 # 存储结果
 ana_count = int((eegdata.shape[1] - BUFFSIZE) / (2 * packetSize) + 1)
 print('ana_count:', ana_count)
+# 存储所有的结果
 res = np.zeros((eegdata.shape[3], eegdata.shape[2], ana_count))
-result = 0
+
+# 计数：统计分析总次数
+analysis_count = 0
+# 计数：统计分析成功的次数
+analysis_accu_count = 0
 
 for exper_i in range(0, eegdata.shape[3]):
 	for target_i in range(0, eegdata.shape[2]):
+		print("本次理论结果为:", freqList[target_i])
 		# 把原数组降至二维
 		data = eegdata[:, :, target_i, exper_i]
-		# print("data_used形状：", data_used.shape)
+		# 用于存储最近四次的分析结果
+		res_arr = np.zeros(4)
 		# 用于分析的数据数组
 		data_used = np.array([])
 
@@ -99,17 +111,10 @@ for exper_i in range(0, eegdata.shape[3]):
 						data_used = data_used[:, -BUFFSIZE : ]
 
 			if data_used.shape[1] == BUFFSIZE:
-				# print("进入分析")
-				# start = time.perf_counter()
-
-				# 当数组长度超过缓存长度，则进行处理
-				# 选择导联
-				# ch_used = [21, 25, 26, 27, 28, 29, 30, 31, 32]
+				print("analysis start")
 				ch_used = [20, 24, 25, 26, 27, 28, 29, 30, 31]
-
 				# data used
 				data_chused = data_used[ch_used, :]
-
 				# the number of channels usd
 				channel_usedNum = len(ch_used)
 
@@ -122,13 +127,9 @@ for exper_i in range(0, eegdata.shape[3]):
 				data_removeBaseline = data_50hz - np.median(data_50hz, -1).reshape(channel_usedNum, 1)
 				# bandpass filter
 				data_bandpass = signal.filtfilt(B, A, data_removeBaseline)
-				# print("降采样后的数组形状：", data_downSample.shape)
 
-				# 现在方法二的用时是方法一的十倍
+				result = 0
 				if method == 1:
-					# print("进入方法一")
-					# start = time.perf_counter()
-
 					# CCA
 					num_class_cca = len(freqList)
 					# 用于存储数据与参考信号的相关系数
@@ -139,36 +140,35 @@ for exper_i in range(0, eegdata.shape[3]):
 						cca.fit(data_bandpass.T, refdata_cca)
 						U, V = cca.transform(data_bandpass.T, refdata_cca)
 						r_cca[class_i] = np.corrcoef(U[:, 0], V[:, 0])[0, 1]
-					# 获取相关系数值最大的序号
-					index_class_cca = np.argmax(r_cca)
-					result = freqList[index_class_cca]
+					print("本次分析采用CCA")
+					print("CCA:", r_cca)
 
-					# print("退出方法一")
-					# end = time.perf_counter()
-					# print("执行一次方法一需用时", end - start)
+					# 获取相关系数排序
+					index_r = np.argsort(r_cca)
+					# 判断本次分类是否有效
+					d = r_cca[index_r[-1]] - r_cca[index_r[-2]]
+					print("差值：", d)
+					d_normal = d * 1.0 / r_cca[index_r[-1]]
+					print("归一化差值：", d_normal)
+					if d_normal > r_threshold:
+						# 获取相关系数最大的索引并查找对应频率
+						# 将查找到的频率添加到结果数组中
+						# 四次中三次相同则可确定
+						i_r = np.argmax(r_cca)
+						result = freqList[i_r]
+						print("本次分类有效，结果为", result)
+					else:
+						print("本次分类无效")
+						result = 0
+						# 跳过下面所有环节
 				elif method == 2:
-					# print("进入方法二")
-					# start = time.perf_counter()
-
+					# FBCCA
 					num_class_fbcca = len(freqList)
 					# eigenvalue_r_fbcca:存储子带数据与各个参考信号的相关系数，num_fbs x num_class_fbcca的数组
 					eigenvalue_r_fbcca = np.zeros((num_fbs, num_class_fbcca))
 
-					print("FBCCA start")
-					start1 = time.perf_counter()
-
 					# num_fbs:子带数量
 					for fb_i in range(0, num_fbs):
-						# 滤波器参数设置
-						# Wp_fbcca = [passband[fb_i] / (downSampleRate / 2), 90 / (downSampleRate / 2)]
-						# Ws_fbcca = [stopband[fb_i] / (downSampleRate / 2), 100 / (downSampleRate / 2)]
-						# Rp_fbcca = 3
-						# Rs_fbcca = 60
-						# N_fbcca, Wn_fbcca = signal.cheb1ord(Wp_fbcca, Ws_fbcca, Rp_fbcca, Rs_fbcca)
-						# bp_R_fbcca = 0.5
-						# B_trans, A_trans = signal.cheby1(N_fbcca, bp_R_fbcca, Wn_fbcca, "bandpass")
-						# 滤波获取子带
-						# data_fbcca = signal.filtfilt(B_trans, A_trans, data_bandpass)
 						data_fbcca = basic_filterbank.filterbank(data_bandpass, downSampleRate, fb_i)
 						# 子带数据与参考数据进行CCA分析
 						for class_i in range(0, num_class_fbcca):
@@ -179,52 +179,72 @@ for exper_i in range(0, eegdata.shape[3]):
 							eigenvalue_r_fbcca[fb_i, class_i] = np.corrcoef(U[:, 0], V[:, 0])[0, 1]
 					# 计算加权后的相关系数
 					r_fbcca = fb_coefs @ (eigenvalue_r_fbcca ** 2)
+					print("本次分析采用FBCCA")
+					print("FBCCA:", r_fbcca)
 
-					print("FBCCA finish")
-					end1 = time.perf_counter()
-					print("FBCCA time", end1 - start1)
+					# 获取相关系数排序
+					index_r = np.argsort(r_fbcca)
+					# 判断本次分类是否有效
+					d = r_fbcca[index_r[-1]] - r_fbcca[index_r[-2]]
+					print("差值：", d)
+					d_normal = d * 1.0 / r_fbcca[index_r[-1]]
+					print("归一化差值：", d_normal)
+					if d_normal > r_threshold:
+						# 获取相关系数最大的索引并查找对应频率
+						# 将查找到的频率添加到结果数组中
+						# 四次中三次相同则可确定
+						i_r = np.argmax(r_fbcca)
+						result = freqList[i_r]
+						print("本次分类有效，结果为", result)
+					else:
+						print("本次分类无效")
+						result = 0
+						# 跳过下面所有环节
+					
+					# index_class_cca = np.argmax(r_fbcca)
+					# result = freqList[index_class_cca]
 
-					index_class_cca = np.argmax(r_fbcca)
-					result = freqList[index_class_cca]
+				# 分析结束，分析总次数加一
+				analysis_count = analysis_count + 1
 
-					# print("退出方法二")
-					# end = time.perf_counter()
-					# print("执行一次方法二需用时", end - start)
+				real_res = 0
+				if isfind == 1:
+					# 四次中三次相同
+					res_arr = np.append(res_arr, result)[1:]
+					print("res array:", res_arr)
+					real_res = int(find.find(res_arr))
+					if real_res == 0:
+						print("本次未分析出结果！！")
+					else:
+						print("分析成功！！")
+						print("输出结果为：", real_res)
+				elif isfind == 0:
+					# 直接输出结果
+					real_res = result
+				
+				if real_res == freqList[target_i]:
+					analysis_accu_count = analysis_accu_count + 1
 
-				buffNum = BUFFSIZE / packetSize - 1
-				ana_i = int((packet_i - buffNum) / 2)
-				res[exper_i, target_i, ana_i] = result
+				# buffNum = BUFFSIZE / packetSize - 1
+				ana_i = int((packet_i - (BUFFSIZE / packetSize - 1)) / 2)
+				res[exper_i, target_i, ana_i] = real_res
 
-				# 根据分析结果发布指令，每次分析结束后都执行一次
-				if result == 20:
-					# do something
-					print("the frequency to start camera is", result)
-					camera_on = True
-				if camera_on == True:
-					match result:
-						case 9:
-							print(9)
-						case 10:
-							print(10)
-						case 11:
-							print(11)
-						case 12:
-							print(12)
-						case 13:
-							print(13)
-						case 14:
-							print(14)
-						case 15:
-							print(15)
-						case 16:
-							print(16)
-						case 17:
-							print(17)
-						case _:
-							print("I am everything~")
+				print("analysis finish\n")
 
-				# print("退出分析")
-				# end = time.perf_counter()
-				# print("执行一次分析需用时", end - start)
-	print("target x analysis:", res[exper_i])
-print("final result:", res)
+	print("第", exper_i + 1, "次实验结果为：", res[exper_i])
+print("最终结果汇总:", res)
+if method == 1:
+	print("本次离线分析使用了CCA")
+elif method == 2:
+	print("本次离线分析使用了FBCCA")
+if isfind == 1:
+	print("本次采用的结果输出方式为:3/4")
+elif isfind == 0:
+	print("本次采用的结果输出方式为:直接输出")
+print("本次使用的数据长度为：", t_used, "s")
+print("本次使用的参考信号权重为：", w_sincos)
+print("本次使用的归一化阈值为：", r_threshold)
+print("本次共分析：", analysis_count, "次")
+print("其中分析正确的有：", analysis_accu_count, "次")
+accuracy_rate = (analysis_accu_count * 1.0) / (analysis_count * 1.0)
+print("正确率为：", accuracy_rate * 100, "%")
